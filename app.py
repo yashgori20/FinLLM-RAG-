@@ -3,11 +3,12 @@ import streamlit as st
 import pickle
 import faiss
 import numpy as np
+import pandas as pd
 from sentence_transformers import SentenceTransformer
 from groq import Groq
 
-# Set your Groq API Key (ensure this environment variable is set)
-GROQ_API_KEY = "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"
+# Set your Groq API Key (use environment variable for security)
+GROQ_API_KEY = "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"  # Ensure this environment variable is set
 client = Groq(api_key=GROQ_API_KEY)
 
 # Load the embedding model
@@ -16,7 +17,7 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 # Paths to your assets folder
 assets_folder = os.path.join(os.getcwd(), 'assets')
 
-# Function to load resources for industry and circular compliance
+# Function to load resources from local storage
 def load_resources():
     # Paths to index and chunk files
     industry_index_path = os.path.join(assets_folder, 'industry_index.faiss')
@@ -38,26 +39,8 @@ def load_resources():
         circular_chunks = pickle.load(f)
     return industry_index, industry_chunks, circular_index, circular_chunks
 
-# Function to load resources for Model 2 (financial data)
-def load_financial_data_resources():
-    # Paths to index and data texts
-    data_index_path = os.path.join(assets_folder, 'financial_data_index.faiss')
-    data_texts_path = os.path.join(assets_folder, 'financial_data_texts.pkl')
-
-    # Check if the files exist
-    if not all(os.path.exists(path) for path in [data_index_path, data_texts_path]):
-        st.error("Financial data index and texts not found in the assets folder. Please ensure they are present.")
-        st.stop()
-
-    # Load FAISS index and data texts
-    data_index = faiss.read_index(data_index_path)
-    with open(data_texts_path, 'rb') as f:
-        data_texts = pickle.load(f)
-    return data_index, data_texts
-
 # Prepare data
 industry_index, industry_chunks, circular_index, circular_chunks = load_resources()
-data_index, data_texts = load_financial_data_resources()
 
 # Function to retrieve relevant chunks
 def retrieve_relevant_chunks(query, index, chunks, top_k=5):
@@ -72,44 +55,53 @@ def circular_compliance():
     user_query = st.text_area("Enter your scenario or question:", key='circular_input')
     if st.button("Check Compliance", key='circular_button'):
         if user_query:
-            try:
-                relevant_chunks = retrieve_relevant_chunks(user_query, circular_index, circular_chunks, top_k=10)
-                context = "\n".join(relevant_chunks)
-                prompt = f"""
-You are an expert assistant helping to check compliance with RBI Master Circulars. Based on the following excerpts:
+            relevant_chunks = retrieve_relevant_chunks(user_query, circular_index, circular_chunks)
+            context = "\n".join(relevant_chunks)
+            prompt =  f"""
+You are an expert RBI compliance analyst. Based on the provided RBI Master Circular on Management of Advances:
 
 {context}
 
-User's Scenario or Question:
+Please analyze the following scenario for compliance:
 {user_query}
 
-Provide a detailed and precise analysis indicating whether the scenario is compliant with the RBI circulars. Your response should include:
+Provide a detailed compliance analysis with the following structure:
 
-- **Direct Answer**: Clearly state whether the action is permitted or prohibited.
-- **Specific References**: Cite relevant circular numbers and specific sections.
-- **Key Compliance Points**: Highlight important points from the circular that apply to the scenario.
-- **Explanation**: Briefly explain why the action is compliant or not.
-- **Recommendation**: Suggest what the bank should do in this situation.
+1. Compliance Status:
+- Clear statement whether the scenario is compliant or non-compliant
+- Level of certainty in the assessment
 
-Please format your response with headings for each section (e.g., "Direct Answer", "Specific References", etc.).
+2. Relevant Circular Details:
+- Specific section(s) and paragraph references
+- Direct quotes from applicable sections where relevant
 
-Answer:
+3. Detailed Analysis:
+- Breakdown of key compliance requirements
+- Calculation/numerical analysis if applicable
+- Specific points of compliance/non-compliance
+
+4. Additional Considerations:
+- Related requirements or obligations
+- Monitoring/reporting requirements if applicable
+
+5. Recommendation:
+- Clear guidance on what needs to be done for compliance
+- Specific steps to address any non-compliance
+
+Please provide definitive guidance based solely on the circular content, avoiding ambiguity or speculation.
+
+Response:
 """
-                chat_completion = client.chat.completions.create(
-                    messages=[
-                        {'role': 'user', 'content': prompt}
-                    ],
-                    model="gemma2-9b-it",
-                    stream=False,
-                    temperature=0.0
-                )
-                response = chat_completion.choices[0].message.content.strip()
-                st.write(response)
-            except Exception as e:
-                st.error(f"An error occurred: {e}")
-                st.error("Please check your API key and model availability.")
-        else:
-            st.info("Please enter a scenario or question to proceed.")
+            chat_completion = client.chat.completions.create(
+                messages=[
+                    {'role': 'user', 'content': prompt}
+                ],
+                model="gemma2-9b-it",
+                stream=False,
+                temperature=0.0
+            )
+            response = chat_completion.choices[0].message.content.strip()
+            st.write(response)
 
 # Function for Industry Classification (Problem Statement 3)
 def industry_classification():
@@ -117,10 +109,9 @@ def industry_classification():
     user_keywords = st.text_input("Enter keywords related to the industry:", key='industry_input')
     if st.button("Get Industry Classification", key='industry_button'):
         if user_keywords:
-            try:
-                relevant_chunks = retrieve_relevant_chunks(user_keywords, industry_index, industry_chunks)
-                context = "\n".join(relevant_chunks)
-                prompt = f"""
+            relevant_chunks = retrieve_relevant_chunks(user_keywords, industry_index, industry_chunks)
+            context = "\n".join(relevant_chunks)
+            prompt = f"""
 You are an assistant helping to classify industries based on keywords. Based on the following information:
 
 {context}
@@ -132,21 +123,16 @@ Suggest the most appropriate industry classification codes. Ask any necessary fo
 
 Answer:
 """
-                chat_completion = client.chat.completions.create(
-                    messages=[
-                        {'role': 'user', 'content': prompt}
-                    ],
-                    model="gemma2-9b-it",
-                    stream=False,
-                    temperature=0.0
-                )
-                response = chat_completion.choices[0].message.content.strip()
-                st.write(response)
-            except Exception as e:
-                st.error(f"An error occurred: {e}")
-                st.error("Please check your API key and model availability.")
-        else:
-            st.info("Please enter keywords to proceed.")
+            chat_completion = client.chat.completions.create(
+                messages=[
+                    {'role': 'user', 'content': prompt}
+                ],
+                model="gemma2-9b-it",
+                stream=False,
+                temperature=0.0
+            )
+            response = chat_completion.choices[0].message.content.strip()
+            st.write(response)
 
 # Existing calculation function (Problem Statement 1)
 def calculations():
@@ -214,10 +200,8 @@ def run_model1_chat():
 
     if 'chat_history' not in st.session_state:
         st.session_state['chat_history'] = []
-    if 'user_input_model1' not in st.session_state:
-        st.session_state['user_input_model1'] = ''
 
-    user_input = st.text_input("You:", value=st.session_state['user_input_model1'], key="model1_input")
+    user_input = st.text_input("You:", key="model1_input")
 
     if st.button("Send", key='model1_send'):
         if user_input:
@@ -231,17 +215,13 @@ def run_model1_chat():
                     ],
                     model="gemma2-9b-it",
                     stream=False,
-                    temperature=0.0  # Set temperature to zero as per your request
+                    temperature=0.0
                 )
                 response = chat_completion.choices[0].message.content.strip()
                 st.session_state.chat_history.append(("Model", response))
             except Exception as e:
                 st.error(f"An error occurred: {e}")
                 st.error("Please check your API key and model availability.")
-
-            # Clear the input
-            st.session_state['user_input_model1'] = ''
-            st.experimental_rerun()
 
     # Display chat history
     for speaker, message in st.session_state.chat_history:
@@ -250,56 +230,127 @@ def run_model1_chat():
         else:
             st.markdown(f"**Model 1:** {message}")
 
-# Function for Model 2 (Financial Data Assistant)
+
+def retrieve_relevant_financial_statements(query, index, statements, model, top_k=10, max_tokens=1500):
+    query_embedding = model.encode([query], convert_to_numpy=True)
+    distances, indices = index.search(query_embedding.astype('float32'), top_k)
+    retrieved_statements = []
+    total_tokens = 0
+    for idx in indices[0]:
+        statement = statements[idx]['statement']
+        token_count = len(statement.split())
+        if total_tokens + token_count > max_tokens:
+            break
+        retrieved_statements.append(statements[idx])
+        total_tokens += token_count
+    return retrieved_statements
+
+
 def model2_financial_data():
     st.header("Financial Data Assistant (Model 2)")
 
-    # Load resources
-    data_index, data_texts = load_financial_data_resources()
+    # Load the FAISS index and financial statements
+    financial_index_path = os.path.join(assets_folder, 'financial_index.faiss')
+    financial_statements_path = os.path.join(assets_folder, 'financial_statements.pkl')
 
-    # User input
+    # Load FAISS index
+    if not os.path.exists(financial_index_path):
+        st.error("Financial FAISS index not found.")
+        st.stop()
+    financial_index = faiss.read_index(financial_index_path)
+
+    # Load statements
+    if not os.path.exists(financial_statements_path):
+        st.error("Financial statements data not found.")
+        st.stop()
+    with open(financial_statements_path, 'rb') as f:
+        financial_statements = pickle.load(f)
+
+    # Allow the user to input a query
     user_query = st.text_area("Ask a question about Indian state-wise financial details (1980-2015):", key='model2_input')
 
     if st.button("Get Answer", key='model2_button'):
         if user_query:
-            try:
-                # Retrieve relevant data chunks
-                query_embedding = model.encode([user_query], convert_to_numpy=True)
-                distances, indices = data_index.search(query_embedding, k=5)
-                retrieved_texts = [data_texts[i] for i in indices[0]]
+            # Extract metric, state, and year from the user's query
+            import re
 
-                # Prepare the context
-                context = "\n".join(retrieved_texts)
+            # List of possible metrics
+            metrics_list = [
+                'aggregate expenditure', 'capital expenditure', 'gross fiscal deficits',
+                'nominal gsdp series', 'own tax revenues', 'revenue deficits',
+                'revenue expenditure', 'social sector expenditure'
+            ]
 
-                prompt = f"""
-You are an expert assistant helping to answer questions about Indian state-wise financial details from 1980 to 2015. Based on the following data:
+            # Create a pattern to match any of the metrics
+            metrics_pattern = '|'.join(metrics_list)
+            metric_regex = re.compile(rf'\b({metrics_pattern})\b', re.IGNORECASE)
 
-{context}
+            # Extract metric
+            metric_match = metric_regex.search(user_query)
+            if metric_match:
+                query_metric = metric_match.group(1).strip().title()
+            else:
+                query_metric = None
 
-User's Question:
-{user_query}
+            # Extract state
+            # Assuming state names are capitalized properly in the data
+            states_list = list(set(s['state'] for s in financial_statements))
+            states_pattern = '|'.join(states_list)
+            state_regex = re.compile(rf'\b({states_pattern})\b', re.IGNORECASE)
+            state_match = state_regex.search(user_query)
+            if state_match:
+                query_state = state_match.group(1).strip()
+            else:
+                query_state = None
 
-Provide a clear and accurate answer based on the data provided. If the data is insufficient to answer the question, inform the user accordingly.
+            # Extract year
+            year_regex = re.compile(r'(\d{4}(?:-\d{2})?)')
+            year_match = year_regex.search(user_query)
+            if year_match:
+                query_year = year_match.group(1)
+                # Normalize the year format if needed
+                if len(query_year) == 4:
+                    # Convert "1992" to "1992-93"
+                    query_year = f"{query_year}-{str(int(query_year[-2:])+1).zfill(2)}"
+                elif len(query_year) == 7:
+                    # Already in "1992-93" format
+                    pass
+            else:
+                query_year = None
 
-Answer:
-"""
-                chat_completion = client.chat.completions.create(
-                    messages=[
-                        {'role': 'user', 'content': prompt}
-                    ],
-                    model="gemma2-9b-it",
-                    stream=False,
-                    temperature=0.0  # Set temperature to zero as per your request
-                )
-                response = chat_completion.choices[0].message.content.strip()
-                st.write(response)
-            except Exception as e:
-                st.error(f"An error occurred: {e}")
-                st.error("Please check your API key and model availability.")
-        else:
-            st.info("Please enter a question to proceed.")
+            if query_state and query_year:
+                # Collect data based on the extracted information
+                data = {}
+                for s in financial_statements:
+                    if (
+                        s['state'].lower() == query_state.lower() and
+                        s['year'] == query_year
+                    ):
+                        if query_metric:
+                            if s['metric_type'].lower() == query_metric.lower():
+                                data[s['metric_type']] = s['value']
+                                break  # Since we found the specific metric, we can stop
+                        else:
+                            data[s['metric_type']] = s['value']
 
-# Main function to run the app
+                if data:
+                    if query_metric:
+                        # Display only the specific metric
+                        value = data.get(query_metric)
+                        if value is not None:
+                            st.write(f"The {query_metric} of {query_state} in {query_year} is {value}")
+                        else:
+                            st.write(f"{query_metric} data not found for {query_state} in {query_year}.")
+                    else:
+                        # Display all metrics
+                        st.write(f"Financial data for **{query_state}** in **{query_year}**:")
+                        df = pd.DataFrame(list(data.items()), columns=['Metric', 'Value'])
+                        st.table(df)
+                else:
+                    st.write("Data not found for the specified state, year, or metric.")
+            else:
+                st.write("Could not understand the query. Please specify the state and year.")
+
 def main():
     st.set_page_config(page_title="Finance Assistant", page_icon="💸", layout="wide")
     st.title("💸 Finance Assistant")
