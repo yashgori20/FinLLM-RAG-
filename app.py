@@ -2,7 +2,6 @@ import os
 import streamlit as st
 import pickle
 import faiss
-import numpy as np
 import pandas as pd
 from sentence_transformers import SentenceTransformer
 from groq import Groq
@@ -20,10 +19,10 @@ assets_folder = os.path.join(os.getcwd(), 'assets')
 # Function to load resources from local storage
 def load_resources():
     # Paths to index and chunk files
-    industry_index_path = os.path.join(assets_folder, 'industry_index.faiss')
-    industry_chunks_path = os.path.join(assets_folder, 'industry_chunks.pkl')
-    circular_index_path = os.path.join(assets_folder, 'circular_index.faiss')
-    circular_chunks_path = os.path.join(assets_folder, 'circular_chunks.pkl')
+    industry_index_path = os.path.join( 'industry_index.faiss')
+    industry_chunks_path = os.path.join( 'industry_chunks.pkl')
+    circular_index_path = os.path.join( 'circular_index.faiss')
+    circular_chunks_path = os.path.join( 'circular_chunks.pkl')
 
     # Check if the files exist
     if not all(os.path.exists(path) for path in [industry_index_path, industry_chunks_path, circular_index_path, circular_chunks_path]):
@@ -250,8 +249,8 @@ def model2_financial_data():
     st.header("Financial Data Assistant (Model 2)")
 
     # Load the FAISS index and financial statements
-    financial_index_path = os.path.join(assets_folder, 'financial_index.faiss')
-    financial_statements_path = os.path.join(assets_folder, 'financial_statements.pkl')
+    financial_index_path = os.path.join( 'financial_index.faiss')
+    financial_statements_path = os.path.join( 'financial_statements.pkl')
 
     # Load FAISS index
     if not os.path.exists(financial_index_path):
