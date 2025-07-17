@@ -1,5 +1,3 @@
-Of course, here is a README file for your project.
-
 # 💸 Finance Assistant
 
 This project is a multi-functional financial assistant built with Streamlit. It leverages large language models and retrieval-augmented generation (RAG) to provide a suite of tools for financial analysis, compliance, and data retrieval.
