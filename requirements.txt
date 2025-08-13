@@ -1,0 +1,23 @@
+# Core dependencies
+streamlit>=1.40.0
+sentence-transformers>=2.5.1
+faiss-cpu>=1.7.4
+numpy>=2.1.0
+pandas>=2.2.0
+
+# API Client
+groq>=0.4.2
+
+# Deep Learning Dependencies
+torch>=2.2.0
+transformers>=4.37.0
+
+# Supporting Libraries
+scikit-learn>=1.4.0
+tqdm>=4.66.1
+nltk>=3.8.1
+
+# Additional Dependencies
+altair>=5.2.0
+watchdog>=3.0.0
+python-dotenv>=1.0.0
